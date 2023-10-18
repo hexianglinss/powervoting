@@ -18,7 +18,7 @@ import {
   VOTE_FILTER_LIST,
   VOTE_LIST,
   web3AvatarUrl,
-  filecoinMainnetChain
+  filecoinMainnetChain,
 } from '../../common/consts';
 import ListFilter from "../../components/ListFilter";
 import EllipsisMiddle from "../../components/EllipsisMiddle";
@@ -53,18 +53,17 @@ const Home = () => {
   }, [chain, voteStatus])
 
   const initVoteList = () => {
-    setPage(0);
-    setPageSize(5);
     const params = {
       preList: [],
       first: 5,
-      skip: 0
+      skip: 0,
+      resetPage: true
     }
     getVoteList(params);
   }
 
   const getVoteList = async (params: any) => {
-    const { preList, first, skip } = params;
+    const { preList, first, skip, resetPage } = params;
     const variables = {
       first,
       skip,
@@ -72,89 +71,95 @@ const Home = () => {
       orderDirection: 'desc',
     }
     try {
-      let res: any = {};
-      let ipfsList = [];
+      let queryResult;
+      let proposalsLength = 0;
+      let filteredProposals = [];
+
+      const chainId = chain?.id || filecoinMainnetChain.id;
+      // @ts-ignore
       switch (voteStatus) {
         case VOTE_ALL_STATUS:
-          res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
-            query: PROPOSAL_QUERY_ALL,
-            variables
-          })
-          ipfsList = res.data.proposals;
+          queryResult = await queryAllProposals(chainId, variables);
           break;
         case IN_PROGRESS_STATUS:
-          res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
-            query: PROPOSAL_QUERY,
-            variables: {
-              ...variables,
-              status: voteStatus
-            }
-          })
-          ipfsList = res.data.proposals?.filter((item: any) => item.status === IN_PROGRESS_STATUS && Number(item.expTime) > dayjs().unix());
+          queryResult = await queryProposal(chainId, voteStatus, variables);
           break;
         case COMPLETED_STATUS:
-          res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
-            query: PROPOSAL_QUERY,
-            variables: {
-              ...variables,
-              status: voteStatus
-            }
-          })
-          ipfsList = res.data.proposals;
+          queryResult = await queryProposal(chainId, voteStatus, variables);
           break;
         case VOTE_COUNTING_STATUS:
-          res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
-            query: PROPOSAL_QUERY_ALL,
-            variables
-          })
-          ipfsList = res.data.proposals?.filter((item: any) => item.status === IN_PROGRESS_STATUS && Number(item.expTime) <= dayjs().unix());
+          queryResult = await queryAllProposals(chainId, variables);
           break;
       }
+      proposalsLength = queryResult?.data.proposals.length;
+      filteredProposals = queryResult?.data.proposals?.filter((item: any) => {
+        if (voteStatus === IN_PROGRESS_STATUS) {
+          return item.status === IN_PROGRESS_STATUS && Number(item.expTime) > dayjs().unix();
+        } else if (voteStatus === VOTE_COUNTING_STATUS) {
+          return item.status === IN_PROGRESS_STATUS && Number(item.expTime) <= dayjs().unix();
+        }
+        return true;
+      });
 
-      setPage(page + 1);
-      setHasMore(ipfsList.length > 4);
-      const list = await getList(ipfsList) || [];
+      setPage(page => resetPage ? 1 : page + 1);
+      setHasMore(proposalsLength > 4);
+      const list = await getList(filteredProposals) || [];
       setFilterList(VOTE_FILTER_LIST);
       setVotingList([...preList, ...list]);
-    } catch (e: any) {
-      console.log(e);
+    } catch (error) {
+      console.log(error);
     }
   }
-  const getList = async (prop: any) => {
-    const ipfsUrls = prop.map(
+  const getList = async (proposals: any) => {
+    const ipfsUrls = proposals.map(
       (_item: any) => `https://${_item.cid}.ipfs.nftstorage.link/`
     );
     try {
-      const responses = await axios.all(ipfsUrls.map((url: string) => axios.get(url)));
-      const results = [];
-      for (let i = 0; i < responses.length; i++) {
-        const res: any = responses[i];
+      const responses = await Promise.all(ipfsUrls.map((url: string) => axios.get(url)));
+      const results = responses.map((res: any, i: number) => {
         const now = dayjs().unix();
-        let voteStatus = null;
-        if (prop[i].status === IN_PROGRESS_STATUS && now > res.data.Time) {
-          voteStatus = VOTE_COUNTING_STATUS
-        } else {
-          voteStatus = prop[i].status;
-        }
-        const option = res.data.option?.map((item: string, index: number) => {
-          const voteItem = prop[i]?.voteResults?.find((vote: any) => vote.optionId === index.toString());
+        const voteStatus =
+          proposals[i].status === IN_PROGRESS_STATUS && now >= res.data.Time
+            ? VOTE_COUNTING_STATUS
+            : proposals[i].status;
+        const option = res.data.option?.map((item: any, index: number) => {
+          const voteItem = proposals[i]?.voteResults?.find(
+            (vote: any) => vote.optionId.toString() === index.toString()
+          );
           return {
             name: item,
-            count: voteItem?.votes ? Number(voteItem.votes) : 0
-          }
+            count: voteItem?.votes ? Number(voteItem.votes) : 0,
+          };
         });
-        results.push({
+        return {
           ...res.data,
-          id: prop[i].id,
-          cid: prop[i].cid,
+          id: proposals[i].id,
+          cid: proposals[i].cid,
           option,
-          voteStatus
-        });
-      }
+          voteStatus,
+        };
+      });
       return results;
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const queryProposal = async (chainId: number, voteStatus: number, variables: any) => {
+    return await apolloClient(chainId).query({
+      query: PROPOSAL_QUERY,
+      variables: {
+        ...variables,
+        status: voteStatus
+      }
+    });
+  };
+
+  const queryAllProposals = async (chainId: number, variables: any) => {
+    return await apolloClient(chainId).query({
+      query: PROPOSAL_QUERY_ALL,
+      variables
+    });
   };
   const handleFilter = async (status: number) => {
     setVoteStatus(status);
@@ -197,8 +202,8 @@ const Home = () => {
             {/*<div className='ml-1 rounded-full border px-[7px] text-xs text-skin-text'>{item.ProposalType}</div>*/}
           </a>
           <div
-            className={`${vote.color} h-[26px] px-[12px] text-white rounded-xl`}>
-            { vote.label }
+            className={`${vote?.color} h-[26px] px-[12px] text-white rounded-xl`}>
+            { vote?.label }
           </div>
         </div>
         <div className="relative mb-4 line-clamp-2 break-words break-all text-lg pr-[80px] leading-7  cursor-pointer"
@@ -267,32 +272,35 @@ const Home = () => {
         </button>
       </div>
       {
-          votingList.length > 0 ?
-            <div className='home-table overflow-auto pr-4' id='scrollableDiv'>
-              <InfiniteScroll
-                dataLength={votingList.length}
-                next={() => { getVoteList({
+        votingList.length > 0 ?
+          <div className='home-table overflow-auto'>
+            <InfiniteScroll
+              dataLength={votingList.length}
+              next={() => {
+                getVoteList({
                   preList: votingList,
                   first: pageSize,
-                  skip: page * pageSize
-                }) }}
-                hasMore={hasMore}
-                scrollableTarget="scrollableDiv"
-                scrollThreshold={0.99}
-                loader={<p className='text-center'>loading...</p>}
-                endMessage={<p className='text-center'>No More Proposals</p>}
-              >
-                {
-                  votingList.map((item: any, index: number) => renderList(item, index))
-                }
-              </InfiniteScroll>
-            </div> :
-            <Empty
-              className='mt-12'
-              description={
-                <span className='text-white'>No Data</span>
+                  skip: page * pageSize,
+                  resetPage: false
+                });
+              }}
+              hasMore={hasMore}
+              scrollableTarget="scrollBox"
+              scrollThreshold={0.99}
+              loader={<p className='loading text-center'>Loading...</p>}
+              endMessage={<p className='text-center'>No More Proposals</p>}
+            >
+              {
+                votingList.map((item: any, index: number) => renderList(item, index))
               }
-            />
+            </InfiniteScroll>
+          </div> :
+          <Empty
+            className='empty'
+            description={
+              <span className='text-white'>No Data</span>
+            }
+          />
       }
     </div>
   )

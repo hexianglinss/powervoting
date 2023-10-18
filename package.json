@@ -16,6 +16,7 @@
     "@openzeppelin/contracts": "^4.8.2",
     "@openzeppelin/contracts-upgradeable": "^4.9.3",
     "@rainbow-me/rainbowkit": "^1.0.7",
+    "@solana/web3.js": "^1.78.5",
     "@tailwindcss/aspect-ratio": "latest",
     "@tailwindcss/container-queries": "latest",
     "@tailwindcss/forms": "latest",

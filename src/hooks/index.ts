@@ -1,27 +1,35 @@
-import { ethers, utils } from "ethers";
-import * as zksync from "zksync-web3";
-import { Provider } from "zksync-web3";
+import { ethers } from "ethers";
 import { NFTStorage, Blob } from 'nft.storage';
-import abi from "../../public/abi/power-voting.json";
+import fileCoinAbi from "../../contracts/powervoting/PowerVoting_filecoin.json";
+import ethAbi from "../../contracts/powervoting/PowerVoting.json";
 import {
   filecoinMainnetContractAddress,
   contractAddressList,
   NFT_STORAGE_KEY,
+  filecoinMainnetChain,
 } from "../common/consts";
+import {filecoinCalibration} from "wagmi/chains";
 
 export const useDynamicContract = (chainId: number) => {
-  const contractAddress = contractAddressList.find((item: any) => item.id === chainId)?.address || filecoinMainnetContractAddress;
+  const isFileCoinChain = [filecoinMainnetChain.id, filecoinCalibration.id].includes(chainId);
 
+  const contractAddress = contractAddressList.find((item: any) => item.id === chainId)?.address || filecoinMainnetContractAddress;
   // @ts-ignore
   const provider = new ethers.providers.Web3Provider(window.ethereum);
   const signer = provider.getSigner();
+  const abi = isFileCoinChain ? fileCoinAbi : ethAbi;
 
   const contract = new ethers.Contract(contractAddress, abi, signer);
 
   const decodeError = (data: string) => {
     const errorData = data.substring(0, 2) + data.substring(10);
     const defaultAbiCoder = new ethers.utils.AbiCoder();
-    const decodedData =  defaultAbiCoder.decode(['string'], errorData)[0];
+    let decodedData =  '';
+    try {
+      decodedData = defaultAbiCoder.decode(['string'], errorData)[0]
+    } catch (e) {
+      console.log(e);
+    }
     return decodedData;
   }
 
@@ -30,15 +38,16 @@ export const useDynamicContract = (chainId: number) => {
     let code = 200;
     let msg = 'success';
     if (type === 'error') {
-      console.log(data?.error?.data);
       const encodeData = data?.error?.data?.originalError?.data;
       if (encodeData) {
         code = 401
-        msg = decodeError(encodeData);
+        msg = decodeError(encodeData) || 'Operation Failed';
       } else {
-        code = 402
+        code = 402;
+        msg = 'Operation Failed';
       }
     }
+
     return {
       code,
       msg,
@@ -46,14 +55,20 @@ export const useDynamicContract = (chainId: number) => {
     }
   }
 
-  const createVotingApi = async (proposalCid: string, timestamp: number, chainId:number, proposalType: number) => {
+  const createVotingApi = async (proposalCid: string, timestamp: number, chainId:number, proposalType: number, id?: number, ) => {
     try {
-      const data = await contract.createProposal(proposalCid, timestamp, chainId, proposalType);
+      let data = {};
+      if (isFileCoinChain) {
+        data = await contract.createProposal(id, proposalCid, timestamp, chainId, proposalType);
+      } else {
+        data = await contract.createProposal(proposalCid, timestamp, chainId, proposalType);
+      }
       return handleReturn({
         type: 'success',
         data
       })
     } catch (e: any) {
+      console.log(e);
       return handleReturn({
         type: 'error',
         data: e
@@ -91,27 +106,27 @@ export const useDynamicContract = (chainId: number) => {
     }
   }
 
-  const zkSyncDepositApi = async () => {
-    const zkSyncProvider = new Provider("https://testnet.era.zksync.dev");
-    const ethProvider = ethers.getDefaultProvider("goerli");
-    // const signingKey = await signer.getSigningKey();
-    //console.log(signingKey);
-    // const zkSyncWallet = new zksync.Wallet(signingKey, zkSyncProvider, ethProvider);
-
-
-    // const deposit = await zkSyncWallet.deposit({
-    //   token: zksync.utils.ETH_ADDRESS,
-    //   amount: ethers.utils.parseEther("1.0"),
-    // });
-    //
-    // return deposit;
+  const isWhiteListApi = async (address: any) => {
+    try {
+      const data = await contract.allowList(address);
+      return handleReturn({
+        type: 'success',
+        data
+      })
+    } catch (e: any) {
+      console.log(e);
+      return handleReturn({
+        type: 'error',
+        data: e
+      })
+    }
   }
 
   return {
     createVotingApi,
     cancelVotingApi,
     voteApi,
-    zkSyncDepositApi,
+    isWhiteListApi
   }
 }
 

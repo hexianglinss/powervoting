@@ -35,7 +35,7 @@ When creating a proposal, Power Voting dApp will get the current `block.height` 
 
 ### zkSync ###
 
-When on zkSync, contract is deployed on L2, Power Voting dApp will obtain both of L1 and L2 balances of the user's `address` to calculate voting power.
+When on zkSync, contract is deployed on L2, Power Voting dApp will obtain both L1 and L2 balances of the user's `address` to calculate voting power.
 
 ![](./asset/zksync.jpg)
 

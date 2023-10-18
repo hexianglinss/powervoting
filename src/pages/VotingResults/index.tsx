@@ -10,11 +10,15 @@ import {
   filecoinMainnetChain,
   web3AvatarUrl,
   COMPLETED_STATUS,
-  WRONG_NET_STATUS
+  WRONG_NET_STATUS,
+  ethSepoliaChain,
+  zkSyncTestnetChain,
+  taikoChain
 } from "../../common/consts";
 import {apolloClient} from "../../utils/apollo";
 import {VOTE_QUERY} from "../../utils/queries";
 import VoteList from "../../components/VoteList";
+import {scrollSepolia} from "wagmi/chains";
 
 const VotingResults = () => {
   const { chain } = useNetwork();
@@ -44,17 +48,20 @@ const VotingResults = () => {
         openConnectModal && openConnectModal();
       }
     } else {
-      const res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
+      let res: any = {}
+      let voteData: any = {};
+      // @ts-ignore
+      res = await apolloClient(chain?.id || filecoinMainnetChain.id).query({
         query: VOTE_QUERY,
         variables: {
-          id: id
+          id
         }
       })
-      const voteData = res.data.proposal;
+      voteData = res.data.proposal;
       if (voteData?.status === COMPLETED_STATUS) {
         voteStatus = COMPLETED_STATUS;
         data.option?.map((item: string, index: number) => {
-          const voteItem = voteData?.voteResults?.find((vote: any) => vote.optionId === index.toString());
+          const voteItem = voteData?.voteResults?.find((vote: any) => vote.optionId.toString() === index.toString());
           option.push({
             name: item,
             count: voteItem?.votes ? Number(voteItem.votes) : 0
@@ -66,7 +73,7 @@ const VotingResults = () => {
             voteList.push({
               label: data.option[item.OptionId],
               value: item.Votes,
-              Address: item.Address.slice(0, -3),
+              Address: item.Address?.substring(0, 42),
               TransactionHash: item.TransactionHash
             })
           }))
@@ -121,7 +128,7 @@ const VotingResults = () => {
             {votingData?.Name}
           </h1>
           {
-            votingData?.voteStatus &&
+            (votingData?.voteStatus || votingData?.voteStatus === 0) &&
             <div className="flex justify-between mb-6">
               <div className="flex items-center justify-between w-full mb-1 sm:mb-0">
                 <button
@@ -206,7 +213,7 @@ const VotingResults = () => {
                             return (
                               <div key={item.name + index}>
                                 <div className='flex justify-between mb-1 text-skin-link'>
-                                  <div className='flex items-center overflow-hidden'>
+                                  <div className='w-[150px] flex items-center overflow-hidden'>
                                     <span className='mr-1 truncate'>{item.name}</span>
                                   </div>
                                   <div className='flex justify-end'>

@@ -1,9 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { ethers } from 'ethers';
-import { zkSyncTestnet } from "wagmi/chains";
-import { InputNumber, Space, Button, message } from "antd";
+import { InputNumber, message } from "antd";
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {getIpfsId, useDynamicContract} from "../../hooks";
@@ -17,18 +15,20 @@ import {
   MULTI_VOTE,
   VOTE_COUNTING_STATUS,
   WRONG_NET_STATUS,
-  web3AvatarUrl
+  web3AvatarUrl,
+  ethSepoliaChain,
+  zkSyncTestnetChain, taikoChain
 } from "../../common/consts";
 import { timelockEncrypt, roundAt, mainnetClient, Buffer } from "../../../tlock-js/src"
 import "./index.less";
-
+import {scrollSepolia} from "wagmi/chains";
 
 const totalPercentValue = 100;
 
 const Vote = () => {
   const { chain } = useNetwork();
   const chainId = chain?.id || 0;
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
 
   const { id, cid } = useParams();
   const [votingData, setVotingData] = useState({} as any);
@@ -65,7 +65,7 @@ const Vote = () => {
         openConnectModal && openConnectModal();
       }
     } else {
-      if (now <= res.data.Time) {
+      if (now < res.data.Time) {
         voteStatus = IN_PROGRESS_STATUS;
       } else {
         voteStatus = VOTE_COUNTING_STATUS;
@@ -87,23 +87,12 @@ const Vote = () => {
     setOptions(option);
   }
 
-/*  const handleDeposit = async () => {
-    // @ts-ignore
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const signer = provider.getSigner();
-    console.log(signer);
-    const { zkSyncDepositApi } = useDynamicContract(chainId);
-    const deposit = await zkSyncDepositApi();
-    console.log(deposit);
-    // await deposit.wait();
-  }*/
-
   const handleEncrypt = async (value: any) => {
     const payload = Buffer.from(JSON.stringify(value));
 
     const chainInfo = await mainnetClient().chain().info();
 
-    const time = new Date().valueOf();
+    const time = new Date(votingData?.Time * 1000).valueOf();
 
     const roundNumber = roundAt(time, chainInfo) // drand 随机数索引
 
@@ -117,8 +106,6 @@ const Vote = () => {
   }
 
   const startVoting = async () => {
-    // 获取有投票的索引，判断是否填写了投票
-
     const countIndex = options.findIndex((item: any) => item.count > 0);
     if (countIndex < 0) {
       message.warning("Please choose a option to vote");
@@ -147,7 +134,7 @@ const Vote = () => {
         } else if (res.code === 401) {
           message.error(res.msg)
         }
-        setLoading(false);
+        setLoading(false)
       } else {
         // @ts-ignore
         openConnectModal && openConnectModal()
@@ -165,7 +152,7 @@ const Vote = () => {
         setTimeout(() => {
           navigate("/")
         }, 3000)
-      } else if (res.code === 401) {
+      } else {
         message.error(res.msg)
       }
       setLoading(false)
@@ -261,7 +248,7 @@ const Vote = () => {
             {votingData?.Name}
           </h1>
           {
-            (votingData.voteStatus || votingData.voteStatus === 0) &&
+            (votingData?.voteStatus || votingData?.voteStatus === 0) &&
               <div className="flex justify-between mb-6">
                   <div className="flex items-center justify-between w-full mb-1 sm:mb-0">
                       <button
@@ -342,13 +329,6 @@ const Vote = () => {
                         )
                       })
                     }
-                    {/*{
-                      chainId === zkSyncTestnet.id &&
-                        <Space.Compact style={{ width: '100%' }}>
-                            <InputNumber min={1} max={10} defaultValue={3} />
-                            <Button type="primary" onClick={handleDeposit}>Submit</Button>
-                        </Space.Compact>
-                    }*/}
                     <button onClick={startVoting} className="w-full h-[40px] bg-sky-500 hover:bg-sky-700 text-white py-2 px-6 rounded-full" type="submit" disabled={loading}>
                         Vote
                     </button>

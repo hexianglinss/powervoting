@@ -3,6 +3,7 @@ package contract
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -228,6 +229,63 @@ func CountContract(id *big.Int, voteResult []VoteResult, voteListCid string, eth
 		To:        &ethClient.ContractAddress,
 		Value:     ethClient.Amount,
 		Data:      data,
+	})
+	// sign with private key
+	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(ethClient.ChainID), ethClient.PrivateKey)
+	if err != nil {
+		log.Println("types.SignTx error: ", err)
+		return err
+	}
+	// send transaction
+	err = ethClient.Client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		log.Println("client.SendTransaction error: ", err)
+		return err
+	}
+
+	log.Printf("net work：%s, transaction id: %s", ethClient.Name, signedTx.Hash().Hex())
+	return nil
+}
+
+// CountContract contract count
+func CountScrollContract(id *big.Int, voteResult []VoteResult, voteListCid string, ethClient GoEthClient) error {
+	// avoiding nonce duplication in multiple threads
+	lock.Lock()
+	defer lock.Unlock()
+
+	// pack method and param
+	var data []byte
+	var err error
+	data, err = ethClient.Abi.Pack("count", id, voteResult, voteListCid)
+	if err != nil {
+		log.Println("contractAbi.Pack error: ", err)
+		return err
+	}
+
+	// get transaction nonce
+	nonce, err := ethClient.Client.PendingNonceAt(context.Background(), ethClient.WalletAddress)
+	if err != nil {
+		log.Println("PendingNonceAt error: ", err)
+		return err
+	}
+
+	// get suggest gas price
+	gasPrice, err := ethClient.Client.SuggestGasPrice(context.Background())
+	if err != nil {
+		log.Println("client.SuggestGasPrice error: ", err)
+		return err
+	}
+	log.Println("nonce: ", nonce)
+	log.Println("GasPrice: ", gasPrice)
+
+	// create transaction
+	tx := types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		GasPrice: gasPrice,
+		Gas:      ethClient.GasLimit,
+		To:       &ethClient.ContractAddress,
+		Value:    ethClient.Amount,
+		Data:     data,
 	})
 	// sign with private key
 	signedTx, err := types.SignTx(tx, types.LatestSignerForChainID(ethClient.ChainID), ethClient.PrivateKey)

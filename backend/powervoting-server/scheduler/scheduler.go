@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/common"
 	"io"
 	"log"
 	"math/big"
@@ -15,6 +14,8 @@ import (
 	"powervoting-server/model"
 	"strings"
 	"time"
+
+	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/storswiftlabs/tlock"
 	drandhttp "github.com/storswiftlabs/tlock/networks/http"
@@ -176,13 +177,20 @@ func VotingCountHandler(network config.Network, ethClient contract.GoEthClient) 
 
 		//  contract
 		fmt.Println(cid, voteResultList, proposal.ProposalID)
-		err = contract.CountContract(big.NewInt(proposal.ProposalID), voteResultList, cid, ethClient)
-		if err != nil {
-			log.Println("call contract count function error:", err)
+		if network.Id == 534351 {
+			err = contract.CountScrollContract(big.NewInt(proposal.ProposalID), voteResultList, cid, ethClient)
+			if err != nil {
+				log.Println("call contract count function error:", err)
+			}
+			countMap[fmt.Sprintf("%d-%d", network.Id, proposal.ProposalID)] = true
+		} else {
+			err = contract.CountContract(big.NewInt(proposal.ProposalID), voteResultList, cid, ethClient)
+			if err != nil {
+				log.Println("call contract count function error:", err)
+			}
+			countMap[fmt.Sprintf("%d-%d", network.Id, proposal.ProposalID)] = true
 		}
-		countMap[fmt.Sprintf("%d-%d", network.Id, proposal.ProposalID)] = true
 	}
-
 }
 
 func getEthVotes(address string, percent float64, networkId int64) (float64, error) {

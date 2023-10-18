@@ -26,6 +26,7 @@ contract PowerVoting is IPowerVoting, Initializable, OwnableUpgradeable, UUPSUpg
     // proposal AllowList, key: address, value: whether can create proposal
     mapping(address => bool) proposalAllowList;
 
+
     function initialize() public initializer {
         proposalId = 1;
         __UUPSUpgradeable_init();

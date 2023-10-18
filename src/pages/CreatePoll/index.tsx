@@ -1,6 +1,7 @@
 import React, {useState, useEffect} from "react";
 import {message, DatePicker} from "antd";
 import dayjs from "dayjs";
+import axios from 'axios';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import {useNavigate, Link} from "react-router-dom";
@@ -11,10 +12,17 @@ import {RadioGroup} from '@headlessui/react';
 import {useAccount, useNetwork} from "wagmi";
 import {useConnectModal} from "@rainbow-me/rainbowkit";
 import Editor from '../../components/MDEditor';
-import {VOTE_TYPE_OPTIONS, SINGLE_VOTE, DEFAULT_TIMEZONE} from '../../common/consts';
+import {
+  VOTE_TYPE_OPTIONS,
+  SINGLE_VOTE,
+  DEFAULT_TIMEZONE,
+  ethSepoliaChain,
+  zkSyncTestnetChain, filecoinMainnetChain, taikoChain
+} from '../../common/consts';
 import {useDynamicContract, getIpfsId} from "../../hooks";
 import { useTimezoneSelect, allTimezones } from 'react-timezone-select';
 import './index.less';
+import {filecoinCalibration, scrollSepolia} from "wagmi/chains";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -65,35 +73,6 @@ const CreatePoll = () => {
   const validateValue = (value: string) => {
     return value?.trim() !== '';
   };
-
-  const disabledDate = (current: any) => {
-    return current && current < dayjs().subtract(1, 'days').endOf('day');
-  };
-
-  const range = (start: number, end: number) => {
-    const result = [];
-    for (let i = start; i < end; i++) {
-      result.push(i);
-    }
-    return result;
-  }
-
-  const disabledTime = (date: any) => {
-    const hours = dayjs().hour();
-    const minutes = dayjs().minute();
-    const currentDay = dayjs().date();
-    const settingDay = dayjs(date).date();
-    if (date && currentDay === settingDay) {
-      return {
-        disabledHours: () => range(0, hours),
-        disabledMinutes: (selectedHour: any) => selectedHour <= hours ? range(0, minutes) : [],
-      };
-    }
-    return {
-      disabledHours: () => [],
-      disabledMinutes: () => [],
-    }
-  }
     
   const onSubmit = async (values: any) => {
     setLoading(true)
@@ -127,11 +106,12 @@ const CreatePoll = () => {
     if (isConnected) {
       const { createVotingApi } = useDynamicContract(chainId);
       const res = await createVotingApi(cid, expTimestamp, chainId, values.ProposalType);
+
       if (res.code === 200) {
-        message.success("Preparing to wind the chain!");
+        message.success("Storing data on chain!");
         navigate("/");
-      } else if (res.code === 401) {
-        message.error(res.msg);
+      } else {
+        message.error(res?.data?.reason);
       }
       setLoading(false);
     } else {
