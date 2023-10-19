@@ -33,9 +33,9 @@ When creating a proposal, the creator will enter a voting expiration time, and P
 
 When creating a proposal, Power Voting dApp will get the current `block.height` and store it together with proposal content on the blockchain. When a user votes, Power Voting dApp will obtain the balance of the user's `address` corresponding to the `block.height` when the proposal was created at, and then use the asset amount as the voting power to vote.
 
-### zkSync ###
+### zkSync, Scroll, Taiko ###
 
-When on zkSync, contract is deployed on L2, Power Voting dApp will obtain both L1 and L2 balances of the user's `address` to calculate voting power.
+When on zkSync, Scroll and Taiko, contract is deployed on L2, Power Voting dApp will obtain both L1 and L2 balances of the user's `address` to calculate voting power.
 
 ![](./asset/zksync.jpg)
 

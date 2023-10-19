@@ -140,7 +140,9 @@ func VotingCountHandler(network config.Network, ethClient contract.GoEthClient) 
 				votes = votePercent * balance
 			}
 			var ethVotes float64
-			if network.Id == 280 || network.Id == 324 {
+			// 280-zkSync Era Testnet     324-zkSync Era Mainnet
+			// 534351-Scroll Sepolia Testnet    167007-Taiko Jolnir
+			if network.Id == 280 || network.Id == 324 || network.Id == 534351 || network.Id == 167007 {
 				ethVotes, err = getEthVotes(vote.Address, votePercent, network.Id)
 				if err != nil {
 					log.Println("get eth votes error: ", err)
@@ -194,10 +196,10 @@ func VotingCountHandler(network config.Network, ethClient contract.GoEthClient) 
 }
 
 func getEthVotes(address string, percent float64, networkId int64) (float64, error) {
-	// zkSync test net
 	var client contract.GoEthClient
 	var err error
-	if networkId == 280 {
+	// get Goerli testnet client
+	if networkId == 280 || networkId == 534351 || networkId == 167007 {
 		client, err = contract.GetGoerliClient()
 		if err != nil {
 			log.Println("get goerli client error: ", err)
@@ -205,7 +207,7 @@ func getEthVotes(address string, percent float64, networkId int64) (float64, err
 		}
 
 	}
-	// zkSync main net
+	// get Ethereum mainnet client
 	if networkId == 324 {
 		client, err = contract.GetEthMainClient()
 		if err != nil {
